@@ -11,13 +11,15 @@ import  os
 
 
 parser = argparse.ArgumentParser(description='Test in Websites use selenium ')
-parser.add_argument('--file',default="output.txt", help='output file')
+parser.add_argument('--file',default="output", help='file name without extension')
 parser.add_argument('--search',default="test alberto", help='terms to search')
 parser.add_argument('--keyword',default='alberto;gala',help='multiple words "word1i;word2" separate by semicolom')
 #parser.add_argument( '--keyword', action='store', dest='alist',type=str, nargs='*', default=['item1', 'item2','item3'], help="Examples: -i item1  item2, -i item3")
 parser.add_argument('--engine',default="google", help='search engine to find results')
 parser.add_argument('--type',default="count_h3_st", help='search engine to find results')
 parser.add_argument('--test',default="false", help='test mode read from file')
+parser.add_argument('--headless',default="true", help='headless mode activated')
+parser.add_argument('--identifier',default="www.example.com", help='Search identifier')
 args = parser.parse_args()
 print(args.keyword.split(";"))
 
@@ -27,16 +29,26 @@ class Browsertest (unittest.TestCase):
         self.search = test.search
         self.keyword = test.keyword
         self.count = test.count
+        if  args.headless == 'true':
+            self.headless = True
+        else:
+            self.headless = False
     def init_driver(self):
         print('loading..')
         self.driver=webdriver.Firefox()
     def init_remote_driver(self):
 
         options=Options()
-        options.headless = True
+        if self.headless == True:
+            #this server is headless
+           command ='http://127.0.0.1:4444/wd/hub'
+
+        else:
+           #this server is with head to visual inspection 
+           command ='http://127.0.0.1:4445/wd/hub'
         print('loading..')
         self.driver = webdriver.Remote(
-                   command_executor='http://127.0.0.1:4444/wd/hub',
+                   command_executor=command,
                    browser_profile=webdriver.FirefoxProfile("/home/agalan/.mozilla/firefox/ac7cwnzt.auto"),
                    desired_capabilities={
                        'browserName':'firefox',
@@ -49,7 +61,7 @@ class Browsertest (unittest.TestCase):
         html=f.read() 
         return html
     def robot_detection(self,html):
-        soup= BeautifulSoup(html)
+        soup= BeautifulSoup(html,"lxml")
         a=soup.find("title")
         if "www.google.com" in soup.title.string:
             return True
@@ -57,7 +69,7 @@ class Browsertest (unittest.TestCase):
             return False
 
     def test_google_tag(self,html,tag):
-        soup= BeautifulSoup(html)
+        soup= BeautifulSoup(html,"lxml")
         result=soup.find_all(tag)
         tt=[]
         for ky in self.keyword.split(';'):
@@ -66,7 +78,7 @@ class Browsertest (unittest.TestCase):
         return tt
 
     def test_google_class (self,html,clas):
-        soup= BeautifulSoup(html)
+        soup= BeautifulSoup(html,"lxml")
         result=soup.find_all(class_=clas)
         tt=[]
         for ky in self.keyword.split(';'):
@@ -78,7 +90,7 @@ class Browsertest (unittest.TestCase):
         # parse html with a specific parser
         # result an array of text with the matching 
         # result=['a','b','c']
-        soup= BeautifulSoup(html)
+        soup= BeautifulSoup(html,"lxml")
         result=soup.find_all(parser,text=keyword)
         #result=getattr(soup,parser)
         return result
@@ -139,7 +151,7 @@ class Browsertest (unittest.TestCase):
         self.driver.close()
 
     def count_keywords(self,html,regex):
-        soup = BeautifulSoup(html)
+        soup = BeautifulSoup(html,"lxml")
         counter = 0
         for hit in soup.findAll(regex):
             print (self.testkeyword ," ",hit.text)
@@ -147,6 +159,17 @@ class Browsertest (unittest.TestCase):
                 counter = counter + 1
         print("number of counts are: " + str(counter))
         return counter
+
+def iszero (num):
+    """TODO: Docstring for iszero .
+    :returns: TODO
+
+    """
+    if num != 0:
+        return 1
+    else:
+        return 0
+
 
 
 MyObject = type('MyObject', (object,), {})
@@ -170,31 +193,41 @@ if args.test == 'true':
 else:
    br1.init_remote_driver()
    html=br1.html_browser()
-assert not (br1.robot_detection(html)), "Robot detection fix manually firefox -p auto"
- 
+
+# In case robot detection in Google open in visual mode and resolve the issue
+if (br1.robot_detection(html)):
+  #br1.teardown()
+  print ('robot detection')
+  br2 = Browsertest(test)
+  br2.search=args.search
+  br2.keyword=args.keyword
+  br2.headless=False
+  br2.init_remote_driver()
+  br2.html_browser()
+  assert False , "Robot detection fix manually firefox -p auto"
+
 res=br1.test_google_tag(html,"h3")
 res2=br1.test_google_class(html,"st")
 print("total count h3 " + str(res))
 print("total count st " + str(res2))
-datares=args.search+','+','.join(map(str,res))+','+','.join(map(str,res2))+'\n'
-result=""
-idx=0
-for ky in args.keyword.split(";"):
-    result=result+( args.search +";" + ky +";"+args.type+";"+ str(res[idx])+";"+
-            str(res2[idx]) +"\n")
-    idx=idx+1
+
+
+# Count results only first result of h3 and rest of result st
+datares=args.identifier+' ;'+args.search+';'+str(res[0]) +';'+';'.join(map(str,res2))+'\n'
+
+# Count positive results , 0 is not detect 1 if detected
+reszero=list(map(iszero,res))
+res2zero=list(map(iszero,res2))
+datareszero=args.identifier+' ;'+args.search+';'+str(reszero[0]) +';'+';'.join(map(str,res2zero))+'\n'
 
 if args.test == 'true':
    print ("this is a test")
    print( result )
 else:
    br1.teardown()
-   with open(args.file, 'a') as file:
-      #file.write("\"" + args.search +"\"" + )
-      print( result )
-      file.write( result )
-   with open(args.file +".data", 'a') as file:
-      #file.write("\"" + args.search +"\"" + )
+   with open(args.file +".csv", 'a') as file:
       print( datares )
       file.write( datares )
-
+   with open(args.file +".positive.csv", 'a') as file:
+      print( datareszero )
+      file.write( datareszero )

@@ -30,7 +30,6 @@ class Browsertest (unittest.TestCase):
     def init_driver(self):
         print('loading..')
         self.driver=webdriver.Firefox()
- 
     def init_remote_driver(self):
 
         options=Options()
@@ -177,7 +176,7 @@ res=br1.test_google_tag(html,"h3")
 res2=br1.test_google_class(html,"st")
 print("total count h3 " + str(res))
 print("total count st " + str(res2))
-
+datares=args.search+','+','.join(map(str,res))+','+','.join(map(str,res2))+'\n'
 result=""
 idx=0
 for ky in args.keyword.split(";"):
@@ -194,4 +193,8 @@ else:
       #file.write("\"" + args.search +"\"" + )
       print( result )
       file.write( result )
+   with open(args.file +".data", 'a') as file:
+      #file.write("\"" + args.search +"\"" + )
+      print( datares )
+      file.write( datares )
 

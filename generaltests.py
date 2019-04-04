@@ -170,6 +170,20 @@ def iszero (num):
     else:
         return 0
 
+# Create test as a function:  <03-04-19, yourname> # 
+# Make easy data filtering 
+#  Data input : test.py  site:xxxx  "s1;s2;s3" "w11;w12;w13::w21;w22;w23::w31;w32"
+#  Data ouput (counting the results) : identifier site:xxxx;s1.h3.w11;s1.st.h3.w11;..... " 
+#  Data output (set as positive if searched): identifier .....
+
+def test1_scrap_google(test):
+    """scrap count words h3 and st in Google search
+
+    :test: TODO
+    :returns: string with the results to write in a file
+
+    """
+    pass
 
 
 MyObject = type('MyObject', (object,), {})

@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import unittest
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
@@ -126,27 +129,6 @@ class Browsertest (unittest.TestCase):
         html = driver.page_source
         return html
 
-    def test_words(self):
-        driver=self.driver
-        driver.get(self.url)
-        #elem = driver.find_element_by_name("q")
-        #elem.send_keys(self.keyword)
-        #elem.send_keys(Keys.RETURN)
-      #  assert "No results found." not in driver.page_source
-        # load complete HTML file
-        html = driver.page_source
-
-        # regular expression
-        #result=re.findall(self.keyword,body)
-        #print(result.count(self.keyword)) 
-        # search HTML file
-        total = self.count_keywords(html,'h3')
-        try:
-            assert (total) > self.count
-            print('hypothesis true')
-        except AssertionError:
-            print("hypothesis failed")
-
     def teardown(self):
         self.driver.close()
 
@@ -185,6 +167,24 @@ def test1_scrap_google(test):
     """
     pass
 
+def wrapresults(res1,res2,identifier,search,keywords):
+    d=[]
+    d.append(identifier)
+    d.append(search)
+    d.append(map(str,res1))
+    d.append(map(str,res2))
+    return d
+
+def resolve_robot(test):
+    """TODO: Docstring for resolve_robot.
+   """
+    br2 = Browsertest(test)
+    br2.search=args.search
+    br2.keyword=args.keyword
+    br2.headless=False
+    br2.init_remote_driver()
+    br2.html_browser()
+    assert False , "Robot detection fix manually firefox -p auto"
 
 MyObject = type('MyObject', (object,), {})
 test = MyObject()
@@ -200,39 +200,29 @@ if args.engine == "google":
 
 br1 = Browsertest(test)
 br1.search=args.search
+
+
 br1.keyword=args.keyword
+#if args.test == 'true':
+#   html=br1.readhtml_test('./tests/html-alberto.html')
+#else:
 
-if args.test == 'true':
-   html=br1.readhtml_test('./tests/html-alberto.html')
-else:
-   br1.init_remote_driver()
-   html=br1.html_browser()
+br1.init_remote_driver()
+html=br1.html_browser()
 
-# In case robot detection in Google open in visual mode and resolve the issue
 if (br1.robot_detection(html)):
-  #br1.teardown()
   print ('robot detection')
-  br2 = Browsertest(test)
-  br2.search=args.search
-  br2.keyword=args.keyword
-  br2.headless=False
-  br2.init_remote_driver()
-  br2.html_browser()
-  assert False , "Robot detection fix manually firefox -p auto"
+  resolve_robot(test,initparam)
 
+# Count results
 res=br1.test_google_tag(html,"h3")
 res2=br1.test_google_class(html,"st")
-print("total count h3 " + str(res))
-print("total count st " + str(res2))
+lineresult=";".join(wrapresults(res,res2,br1.search,br1.keyword))+'\n'
 
-
-# Count results only first result of h3 and rest of result st
-datares=args.identifier+' ;'+args.search+';'+str(res[0]) +';'+';'.join(map(str,res2))+'\n'
-
-# Count positive results , 0 is not detect 1 if detected
+# Count positive results 0 
 reszero=list(map(iszero,res))
 res2zero=list(map(iszero,res2))
-datareszero=args.identifier+' ;'+args.search+';'+str(reszero[0]) +';'+';'.join(map(str,res2zero))+'\n'
+linereszero=";".join(wrapresults(reszero,res2zero,br1.search,br1.keyword))+'\n'
 
 if args.test == 'true':
    print ("this is a test")

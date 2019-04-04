@@ -15,8 +15,9 @@ import  os
 
 parser = argparse.ArgumentParser(description='Test in Websites use selenium ')
 parser.add_argument('--file',default="output", help='file name without extension')
-parser.add_argument('--search',default="test alberto", help='terms to search')
-parser.add_argument('--keyword',default='alberto;gala',help='multiple words "word1i;word2" separate by semicolom')
+parser.add_argument('--search',default="site:wwww.test.com", help='terms to search')
+parser.add_argument('--searchkeys',default="test:alberto", help='terms to search')
+parser.add_argument('--keyword',default='test1;test2:alber;erto',help='multiple words "word1i;word2" separate by semicolom')
 #parser.add_argument( '--keyword', action='store', dest='alist',type=str, nargs='*', default=['item1', 'item2','item3'], help="Examples: -i item1  item2, -i item3")
 parser.add_argument('--engine',default="google", help='search engine to find results')
 parser.add_argument('--type',default="count_h3_st", help='search engine to find results')
@@ -59,7 +60,7 @@ class Browsertest (unittest.TestCase):
     def readhtml_test(self,file):
         # read html from a file
         # for fast testing and have a clear test framework
-        print('readhtml')
+        print('reading file '+ file)
         f = open(file, "r")
         html=f.read() 
         return html
@@ -71,22 +72,22 @@ class Browsertest (unittest.TestCase):
         else:
             return False
 
-    def test_google_tag(self,html,tag):
+    def test_google_tag(self,html,tag,keywords,search):
         soup= BeautifulSoup(html,"lxml")
         result=soup.find_all(tag)
         tt=[]
-        for ky in self.keyword.split(';'):
+        for ky in keywords:
           data=[x for x in result if  ky in str(x).lower() ]
-          tt.append(len(data))
+          tt.append([search+"."+ky+"."+tag,len(data)])
         return tt
 
-    def test_google_class (self,html,clas):
+    def test_google_class (self,html,clas,keywords,search):
         soup= BeautifulSoup(html,"lxml")
         result=soup.find_all(class_=clas)
         tt=[]
-        for ky in self.keyword.split(';'):
+        for ky in keywords:
           data=[x for x in result if  ky in str(x).lower() ]
-          tt.append(len(data))
+          tt.append([search+"."+ky+"."+clas,len(data)])
         return tt
 
     def parse_keyword (self,html,parser,keyword):
@@ -166,13 +167,21 @@ def test1_scrap_google(test):
 
     """
     pass
+def merge(list1, list2): 
+    merged_list = [(list1[i], list2[i]) for i in range(0, len(list1))] 
+    return merged_list 
+
+def umerge(list):
+    list1=[list[i][0] for i in range(0,len(list))]
+    list2=[list[i][1] for i in range(0,len(list))]
+    return [list1,list2]
 
 def wrapresults(res1,res2,identifier,search,keywords):
     d=[]
     d.append(identifier)
     d.append(search)
-    d.append(map(str,res1))
-    d.append(map(str,res2))
+    d.extend(list(map(str,res1)))
+    d.extend(list(map(str,res2)))
     return d
 
 def resolve_robot(test):
@@ -199,39 +208,46 @@ if args.engine == "google":
    test.count=3
 
 br1 = Browsertest(test)
-br1.search=args.search
 
+if args.test == 'false':
+   br1.init_remote_driver()
 
-br1.keyword=args.keyword
-#if args.test == 'true':
-#   html=br1.readhtml_test('./tests/html-alberto.html')
-#else:
+data=[]
+head=[]
 
-br1.init_remote_driver()
-html=br1.html_browser()
+# Multiple search iterating from searchs
+# merge concatena [[s1,k1],[s2,k2],[s3,k3]]
+# k1 could be string of multiple keywords k;kk;kkk
+for [sky,ky] in merge(args.searchkeys.split(":"),args.keyword.split(":")):
+   br1.search=args.search + ' ' + sky
+   if args.test == 'true':
+       print('testing not browsing')
+       print("query: " + br1.search)
+       html=br1.readhtml_test('./tests/html-alberto.html')
+   else:
+       html=br1.html_browser()
 
-if (br1.robot_detection(html)):
-  print ('robot detection')
-  resolve_robot(test,initparam)
+# IF robot detention, then resolve the issue
+   if (br1.robot_detection(html)):
+     print ('robot detection')
+     resolve_robot(test,initparam)
+   else:
+     # Adding data in a single list  
+     data.extend(br1.test_google_tag(html,"h3",ky.split(";"),sky))
+     data.extend(br1.test_google_class(html,"st",ky.split(";"),sky))
+     head.append(sky+"."+ky+".st")
 
-# Count results
-res=br1.test_google_tag(html,"h3")
-res2=br1.test_google_class(html,"st")
-lineresult=";".join(wrapresults(res,res2,br1.search,br1.keyword))+'\n'
-
-# Count positive results 0 
-reszero=list(map(iszero,res))
-res2zero=list(map(iszero,res2))
-linereszero=";".join(wrapresults(reszero,res2zero,br1.search,br1.keyword))+'\n'
-
+line=[]
+line.append(args.identifier)
+line.append(args.search)
+line.extend(data)
+print (head)
 if args.test == 'true':
    print ("this is a test")
-   print( result )
+   print( line )
 else:
    br1.teardown()
    with open(args.file +".csv", 'a') as file:
       print( datares )
-      file.write( datares )
-   with open(args.file +".positive.csv", 'a') as file:
-      print( datareszero )
-      file.write( datareszero )
+      file.write( line+"\n" )
+

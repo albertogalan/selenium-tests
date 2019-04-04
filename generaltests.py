@@ -11,7 +11,7 @@ import urllib
 import re
 import argparse
 import  os
-
+import hashlib,base64
 
 parser = argparse.ArgumentParser(description='Test in Websites use selenium ')
 parser.add_argument('--file',default="output", help='file name without extension')
@@ -78,7 +78,7 @@ class Browsertest (unittest.TestCase):
         tt=[]
         for ky in keywords:
           data=[x for x in result if  ky in str(x).lower() ]
-          tt.append([search+"."+ky+"."+tag,len(data)])
+          tt.append(len(data))
         return tt
 
     def test_google_class (self,html,clas,keywords,search):
@@ -87,7 +87,7 @@ class Browsertest (unittest.TestCase):
         tt=[]
         for ky in keywords:
           data=[x for x in result if  ky in str(x).lower() ]
-          tt.append([search+"."+ky+"."+clas,len(data)])
+          tt.append(len(data))
         return tt
 
     def parse_keyword (self,html,parser,keyword):
@@ -124,9 +124,9 @@ class Browsertest (unittest.TestCase):
         elem.send_keys("pycon")
         elem.send_keys(Keys.RETURN)
         assert "No results found." not in driver.page_source
-    def html_browser(self):
+    def html_browser(self,search):
         driver=self.driver
-        driver.get(self.url)
+        driver.get(self.url+urllib.parse.quote_plus(args.search+" "+search))
         html = driver.page_source
         return html
 
@@ -142,16 +142,6 @@ class Browsertest (unittest.TestCase):
                 counter = counter + 1
         print("number of counts are: " + str(counter))
         return counter
-
-def iszero (num):
-    """TODO: Docstring for iszero .
-    :returns: TODO
-
-    """
-    if num != 0:
-        return 1
-    else:
-        return 0
 
 # Create test as a function:  <03-04-19, yourname> # 
 # Make easy data filtering 
@@ -195,11 +185,60 @@ def resolve_robot(test):
     br2.html_browser()
     assert False , "Robot detection fix manually firefox -p auto"
 
+def generate_header_google(search,keyword):
+   # Header
+   head=[]
+   for  [sky,ky] in merge(search.split(":"),keyword.split(":")):
+      h3=[sky+"."+x+".h3" for x in ky.split(";")]
+      st=[sky+"."+x+".st" for x in ky.split(";")]
+    #  st=[x for x in ky.split(";")]
+      head.extend(h3)
+      head.extend(st)
+   return head
+def hash64(string):
+    hash64=hashlib.sha256(string.encode('utf-8')).hexdigest()
+    return hash64 
+
+def generate_data_google(br,search,keyword):
+    # Merge concatena [[s1,k1],[s2,k2],[s3,k3]]
+    # Data
+    data=[]
+    for [sky,ky] in merge(args.searchkeys.split(":"),args.keyword.split(":")):
+       br.search=args.search + ' ' + sky
+       if args.test == 'true':
+           print('testing not browsing')
+           print("query: " + br1.search)
+           html=br.readhtml_test('./tests/html-alberto.html')
+       else:
+           name=args.identifier+"-"+sky+"-"+ky
+           print(name)
+           filehtml='./.tmp/'+str(hash64(name)) +".html"
+           filehtml='./.tmp/'+name +".html"
+           if os.path.exists(filehtml):
+             html=br.readhtml_test(filehtml)
+           else:
+             html=br.html_browser(sky)
+             with open( filehtml,'a') as file:
+               file.write( html )
+
+    #IF robot detention, then resolve the issue
+       if (br1.robot_detection(html)):
+         print ('robot detection')
+         os.remove(file)
+         resolve_robot(test,initparam)
+       else:
+         # Adding data in a single list  
+         data.extend(br.test_google_tag(html,"h3",ky.split(";"),sky))
+         data.extend(br.test_google_class(html,"st",ky.split(";"),sky))
+         # head.append(sky+"."+ky+".st")
+    return data
+
+
 MyObject = type('MyObject', (object,), {})
 test = MyObject()
 
 if args.engine == "google":
-   test.url=    'https://www.google.com/search?source=hp&ei=9bScXNWqI87i-AaXyqbADw&q='+ urllib.parse.quote_plus(args.search)
+   test.url=    'https://www.google.com/search?source=hp&ei=9bScXNWqI87i-AaXyqbADw&q='
    tagname="h3"
    keyword=args.keyword
    test.search=args.search
@@ -212,35 +251,13 @@ br1 = Browsertest(test)
 if args.test == 'false':
    br1.init_remote_driver()
 
-data=[]
-head=[]
-
-# Multiple search iterating from searchs
-# merge concatena [[s1,k1],[s2,k2],[s3,k3]]
-# k1 could be string of multiple keywords k;kk;kkk
-for [sky,ky] in merge(args.searchkeys.split(":"),args.keyword.split(":")):
-   br1.search=args.search + ' ' + sky
-   if args.test == 'true':
-       print('testing not browsing')
-       print("query: " + br1.search)
-       html=br1.readhtml_test('./tests/html-alberto.html')
-   else:
-       html=br1.html_browser()
-
-# IF robot detention, then resolve the issue
-   if (br1.robot_detection(html)):
-     print ('robot detection')
-     resolve_robot(test,initparam)
-   else:
-     # Adding data in a single list  
-     data.extend(br1.test_google_tag(html,"h3",ky.split(";"),sky))
-     data.extend(br1.test_google_class(html,"st",ky.split(";"),sky))
-     head.append(sky+"."+ky+".st")
-
 line=[]
 line.append(args.identifier)
 line.append(args.search)
-line.extend(data)
+listint=generate_data_google(br1,args.searchkeys,args.keyword)
+line.extend(list(map(str,listint)))
+head=generate_header_google(args.searchkeys,args.keyword)
+
 print (head)
 if args.test == 'true':
    print ("this is a test")
@@ -248,6 +265,6 @@ if args.test == 'true':
 else:
    br1.teardown()
    with open(args.file +".csv", 'a') as file:
-      print( datares )
-      file.write( line+"\n" )
+      print( line )
+      file.write( ";".join(line) + "\n" )
 

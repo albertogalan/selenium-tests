@@ -1,0 +1,2 @@
+test1 true customers.md "high*voltage:IEC:17025" "high*voltage;高压;laboratory;实验室;test;测试;transformer;cable;insulator;bushing;mov;surge*arrester;lightning:iec;61643;60099;60060;62305;61395;60947;60076;62561;62305;61395;61400;60076;62217;60815;62271;60076;61869;60044;60840;62067;60502;61109;60686;60137;17025;62561;60383:17025"
+

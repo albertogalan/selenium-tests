@@ -12,6 +12,12 @@ import re
 import argparse
 import  os
 import hashlib,base64
+import random
+from time import sleep
+
+# prevent detected by google
+DELAY_FROM=1
+DELAY_TO=4
 
 parser = argparse.ArgumentParser(description='Test in Websites use selenium ')
 parser.add_argument('--file',default="output", help='file name without extension')
@@ -26,9 +32,12 @@ parser.add_argument('--headless',default="true", help='headless mode activated')
 parser.add_argument('--identifier',default="www.example.com", help='Search identifier')
 parser.add_argument('--testname',default="test1", help='Name of the test')
 parser.add_argument('--list',default="list.txt", help='Define a list of searchs')
+parser.add_argument('--testlist',default="testlist.txt", help='Define a list of searchs')
 args = parser.parse_args()
-print(args.keyword.split(";"))
-
+args.searchkeys=args.searchkeys.strip('\"')
+args.keyword=args.keyword.strip('\"')
+args.searchkeys=args.searchkeys.replace("*", " ")
+args.keyword=args.keyword.replace("*", " ")
 class Browsertest (unittest.TestCase):
     def __init__(self,test):
         self.url = test.url
@@ -232,15 +241,19 @@ def generate_data_google(br,search,searchkeys,keyword):
            if os.path.exists(filehtml):
              html=br.readhtml_test(filehtml)
            else:
+             if args.test == 'false':
+               br.init_remote_driver()
+             sleep(random.uniform(DELAY_FROM,DELAY_TO))
              html=br.html_browser(search,sky)
+             br.teardown()
              with open( filehtml,'a') as file:
                file.write( html )
 
        #IF robot detention, then resolve the issue
        if (br.robot_detection(html)):
          print ('robot detection')
-         os.remove(file)
-         resolve_robot(test,initparam)
+         os.remove(filehtml)
+         resolve_robot(test)
        else:
          # Adding data in a single list  
          data.extend(br.test_google_tag(html,"h3",ky.split(";"),sky))
@@ -269,9 +282,6 @@ def one_test_google(identifier,uniqsearch):
 
     br1 = Browsertest(test)
 
-    if args.test == 'false':
-       br1.init_remote_driver()
-
     print("uniq search is " +uniqsearch)
     line=[]
     line.append(identifier+" ") # adding a space to to see more clear the file
@@ -280,12 +290,11 @@ def one_test_google(identifier,uniqsearch):
     line.extend(list(map(str,listint)))
     head=generate_header_google(args.searchkeys,args.keyword)
 
-    print (head)
+    #print (head)
     if args.test == 'true':
-       print ("this is a test")
+       #print ("this is a test")
        print( line )
     else:
-       br1.teardown()
        filename = args.file+".csv"
        if not os.path.exists(filename):
           open(filename,'a').close() # touch file 
@@ -294,7 +303,7 @@ def one_test_google(identifier,uniqsearch):
        aa=open(args.file+".csv",'r').read().find(identifier) 
        if aa == -1 :
            with open(args.file +".csv", 'a') as file:
-              print( line )
+              #print( line )
               file.write( ";".join(line) + "\n" )
            logs_add(args.testname,identifier)
     return True

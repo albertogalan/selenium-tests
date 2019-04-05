@@ -24,6 +24,8 @@ parser.add_argument('--type',default="count_h3_st", help='search engine to find 
 parser.add_argument('--test',default="false", help='test mode read from file')
 parser.add_argument('--headless',default="true", help='headless mode activated')
 parser.add_argument('--identifier',default="www.example.com", help='Search identifier')
+parser.add_argument('--testname',default="test1", help='Name of the test')
+parser.add_argument('--list',default="list.txt", help='Define a list of searchs')
 args = parser.parse_args()
 print(args.keyword.split(";"))
 
@@ -32,7 +34,7 @@ class Browsertest (unittest.TestCase):
         self.url = test.url
         self.search = test.search
         self.keyword = test.keyword
-        self.count = test.count
+        self.identifier = test.identifier
         if  args.headless == 'true':
             self.headless = True
         else:
@@ -124,9 +126,9 @@ class Browsertest (unittest.TestCase):
         elem.send_keys("pycon")
         elem.send_keys(Keys.RETURN)
         assert "No results found." not in driver.page_source
-    def html_browser(self,search):
+    def html_browser(self,search,searchkeys):
         driver=self.driver
-        driver.get(self.url+urllib.parse.quote_plus(args.search+" "+search))
+        driver.get(self.url+urllib.parse.quote_plus(search+" "+searchkeys))
         html = driver.page_source
         return html
 
@@ -182,12 +184,14 @@ def resolve_robot(test):
     br2.keyword=args.keyword
     br2.headless=False
     br2.init_remote_driver()
-    br2.html_browser()
+    br2.html_browser("hello","test")
     assert False , "Robot detection fix manually firefox -p auto"
 
 def generate_header_google(search,keyword):
    # Header
    head=[]
+   head.extend(["id"])
+   head.extend(["mainsearch"])
    for  [sky,ky] in merge(search.split(":"),keyword.split(":")):
       h3=[sky+"."+x+".h3" for x in ky.split(";")]
       st=[sky+"."+x+".st" for x in ky.split(";")]
@@ -195,34 +199,45 @@ def generate_header_google(search,keyword):
       head.extend(h3)
       head.extend(st)
    return head
+
 def hash64(string):
     hash64=hashlib.sha256(string.encode('utf-8')).hexdigest()
     return hash64 
 
-def generate_data_google(br,search,keyword):
+def logs_add(testid,identifier):
+    """
+    Create a logs of every test done
+    """
+    filename = "./.logs/"+testid+".txt"
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+    with open(filename, "a") as f:
+            f.write(identifier+"\n")
+
+def generate_data_google(br,search,searchkeys,keyword):
     # Merge concatena [[s1,k1],[s2,k2],[s3,k3]]
     # Data
     data=[]
-    for [sky,ky] in merge(args.searchkeys.split(":"),args.keyword.split(":")):
-       br.search=args.search + ' ' + sky
+    for [sky,ky] in merge(searchkeys.split(":"),keyword.split(":")):
+       br.search=search + ' ' + sky
        if args.test == 'true':
            print('testing not browsing')
            print("query: " + br1.search)
            html=br.readhtml_test('./tests/html-alberto.html')
        else:
-           name=args.identifier+"-"+sky+"-"+ky
+           name=br.identifier+"-"+sky+"-"+ky
            print(name)
            filehtml='./.tmp/'+str(hash64(name)) +".html"
            filehtml='./.tmp/'+name +".html"
+           os.makedirs(os.path.dirname(filehtml), exist_ok=True)
            if os.path.exists(filehtml):
              html=br.readhtml_test(filehtml)
            else:
-             html=br.html_browser(sky)
+             html=br.html_browser(search,sky)
              with open( filehtml,'a') as file:
                file.write( html )
 
-    #IF robot detention, then resolve the issue
-       if (br1.robot_detection(html)):
+       #IF robot detention, then resolve the issue
+       if (br.robot_detection(html)):
          print ('robot detection')
          os.remove(file)
          resolve_robot(test,initparam)
@@ -233,38 +248,60 @@ def generate_data_google(br,search,keyword):
          # head.append(sky+"."+ky+".st")
     return data
 
+def one_test_google(identifier,uniqsearch):
+    """TODO: Docstring for one_test.
+    Process one test 
+    :test:  Parameter test
+    :returns: true if no error
 
-MyObject = type('MyObject', (object,), {})
-test = MyObject()
+    """
+    MyObject = type('MyObject', (object,), {})
+    test = MyObject()
 
-if args.engine == "google":
-   test.url=    'https://www.google.com/search?source=hp&ei=9bScXNWqI87i-AaXyqbADw&q='
-   tagname="h3"
-   keyword=args.keyword
-   test.search=args.search
-   test.keyword=args.keyword
-   test.type="h3"
-   test.count=3
+    if args.engine == "google":
+       test.url='https://www.google.com/search?source=hp&ei=9bScXNWqI87i-AaXyqbADw&q='
+       tagname="h3"
+       keyword=args.keyword
+       test.search=uniqsearch
+       test.keyword=args.keyword
+       test.type="h3"
+       test.identifier=identifier
 
-br1 = Browsertest(test)
+    br1 = Browsertest(test)
 
-if args.test == 'false':
-   br1.init_remote_driver()
+    if args.test == 'false':
+       br1.init_remote_driver()
 
-line=[]
-line.append(args.identifier)
-line.append(args.search)
-listint=generate_data_google(br1,args.searchkeys,args.keyword)
-line.extend(list(map(str,listint)))
-head=generate_header_google(args.searchkeys,args.keyword)
+    print("uniq search is " +uniqsearch)
+    line=[]
+    line.append(identifier+" ") # adding a space to to see more clear the file
+    line.append(uniqsearch)
+    listint=generate_data_google(br1,uniqsearch,args.searchkeys,args.keyword)
+    line.extend(list(map(str,listint)))
+    head=generate_header_google(args.searchkeys,args.keyword)
 
-print (head)
-if args.test == 'true':
-   print ("this is a test")
-   print( line )
+    print (head)
+    if args.test == 'true':
+       print ("this is a test")
+       print( line )
+    else:
+       br1.teardown()
+       filename = args.file+".csv"
+       if not os.path.exists(filename):
+          open(filename,'a').close() # touch file 
+          with open(filename,'a') as file:
+              file.write(";".join(head)+"\n")
+       aa=open(args.file+".csv",'r').read().find(identifier) 
+       if aa == -1 :
+           with open(args.file +".csv", 'a') as file:
+              print( line )
+              file.write( ";".join(line) + "\n" )
+           logs_add(args.testname,identifier)
+    return True
+
+if os.path.exists(args.list):
+    lines = open(args.list,"r")
+    for l in lines:
+       one_test_google (l.rstrip('\n'),l.rstrip('\n'))
 else:
-   br1.teardown()
-   with open(args.file +".csv", 'a') as file:
-      print( line )
-      file.write( ";".join(line) + "\n" )
-
+    one_test_google(arg.identifier,args.search)
